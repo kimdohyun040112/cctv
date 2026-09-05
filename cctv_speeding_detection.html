@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CCTV 과속 감지 시스템</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1220;color:#e8eef8;font-family:'Segoe UI','Malgun Gothic',Arial,sans-serif}
+.app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.sidebar{background:#111a2b;border-right:1px solid #25324a;padding:24px 18px;overflow-y:auto}
+.logo{font-size:20px;font-weight:800;margin-bottom:28px}.logo span{font-size:25px}
+.nav{display:grid;gap:8px}.nav button{border:0;background:transparent;color:#9eacc2;text-align:left;padding:13px;border-radius:10px;font-size:14px;cursor:pointer;transition:all 0.2s}
+.nav button.active,.nav button:hover{background:#1d2a43;color:#fff}
+.info{margin-top:35px;padding:14px;border:1px solid #293750;border-radius:12px;color:#93a4bd;font-size:12px;line-height:1.7}
+.main{padding:26px;max-width:1500px;width:100%;margin:auto;overflow-y:auto}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+.title h1{margin:0 0 6px;font-size:25px}.title p{margin:0;color:#8292ab;font-size:13px}
+.status{display:flex;align-items:center;gap:8px;color:#75e2a6;font-size:13px}
+.dot{width:9px;height:9px;border-radius:50%;background:#43dc8b;box-shadow:0 0 12px #43dc8b;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 12px #43dc8b}50%{box-shadow:0 0 20px #43dc8b}}
+.grid{display:grid;grid-template-columns:minmax(500px,2fr) minmax(300px,1fr);gap:18px}
+.card{background:#111a2b;border:1px solid #25324a;border-radius:14px;padding:18px;transition:border-color 0.2s}
+.card:hover{border-color:#33445f}
+.card h2{font-size:15px;margin:0 0 14px;color:#fff}
+.video-wrap{position:relative;background:#050912;border-radius:10px;overflow:hidden;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center}
+video{width:100%;height:100%;object-fit:contain;background:#050912}
+canvas.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.empty{position:absolute;text-align:center;color:#66758c;z-index:10}
+.empty b{display:block;color:#aab7ca;margin-bottom:7px;font-size:14px}
+.empty p{margin:0;font-size:12px}
+.controls{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
+.btn{border:1px solid #33445f;background:#18243a;color:#dce6f4;padding:9px 13px;border-radius:8px;cursor:pointer;font-size:13px;transition:all 0.2s;white-space:nowrap}
+.btn:hover{background:#21314c;border-color:#44556f}
+.btn:active{transform:scale(0.98)}
+.urlInput{flex:1;min-width:260px;background:#0c1525;border:1px solid #2a3850;color:#fff;border-radius:8px;padding:9px 12px;font-size:13px;transition:border-color 0.2s}
+.urlInput:focus{outline:none;border-color:#2764d7}
+.urlInput::placeholder{color:#556376}
+.btn.primary{background:#2764d7;border-color:#2764d7;font-weight:600}
+.btn.primary:hover{background:#3570e8;border-color:#3570e8}
+.btn.danger{background:#7d2633;border-color:#7d2633}
+.btn.danger:hover{background:#a43545;border-color:#a43545}
+input[type=file]{display:none}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{background:#0d1627;border:1px solid #243149;border-radius:10px;padding:13px;text-align:center}
+.stat small{display:block;color:#8191aa;font-size:11px;margin-bottom:8px}
+.stat strong{font-size:22px;display:block}
+.safe{color:#57d99a}.warn{color:#ffbd5c}.danger-t{color:#ff6877}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{display:flex;flex-direction:column}
+.field label{color:#8999b1;font-size:11px;margin-bottom:6px;font-weight:600}
+.field input{background:#0c1525;border:1px solid #2a3850;color:#fff;border-radius:8px;padding:9px;font-size:13px;transition:border-color 0.2s}
+.field input:focus{outline:none;border-color:#2764d7}
+.log{max-height:400px;overflow-y:auto;border:1px solid #243149;border-radius:8px;background:#0d1627}
+.row{display:grid;grid-template-columns:100px 80px 100px 1fr;gap:8px;padding:10px;border-bottom:1px solid #202c42;font-size:12px;align-items:center}
+.row.head{background:#0a1220;color:#71819a;font-size:11px;font-weight:600;position:sticky;top:0;z-index:5}
+.row:last-child{border-bottom:none}
+.emptylog{color:#66758c;text-align:center;padding:25px;grid-column:1/-1}
+.note{margin-top:14px;color:#72829a;font-size:11px;line-height:1.6;padding:10px;background:#0a1220;border-radius:8px;border-left:3px solid #2764d7}
+.alert-box{background:#4a2d2d;border:1px solid #7d2633;border-radius:8px;padding:12px;margin-top:10px;font-size:12px;color:#ff9999}
+.alert-box b{display:block;margin-bottom:4px}
+@media(max-width:950px){
+  .app{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .grid{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .form{grid-template-columns:1fr}
+  .row{grid-template-columns:60px 60px 80px 1fr;font-size:11px}
+  .row.head{grid-template-columns:60px 60px 80px 1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="logo"><span>🚦</span> CCTV SAFE</div>
+  <div class="nav">
+    <button class="active" onclick="navTo('dashboard')">📊 대시보드</button>
+    <button onclick="navTo('settings')">⚙️ 감지 설정</button>
+    <button onclick="navTo('logs')">🚨 경고 로그</button>
+    <button onclick="navTo('help')">❓ 도움말</button>
+  </div>
+  <div class="info">
+    <b>경산시 압량읍 압독로</b><br>
+    CCTV 과속 감지 시스템<br>
+    제한속도 및 과속 차량을 모니터링합니다.<br><br>
+    <span style="color:#57d99a">✓ 실시간 분석 활성화</span>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="top">
+    <div class="title">
+      <h1>CCTV 과속 감지 시스템</h1>
+      <p>차량 움직임 분석 · 속도 추정 · 경고 기록</p>
+    </div>
+    <div class="status">
+      <i class="dot"></i>
+      <span id="statusText">대기 중</span>
+    </div>
+  </header>
+
+  <section id="dashboard" class="grid">
+    <div class="card">
+      <h2>🎥 CCTV 영상</h2>
+      <div class="video-wrap" id="videoWrap">
+        <video id="video" muted playsinline></video>
+        <canvas class="overlay" id="overlay"></canvas>
+        <div class="empty" id="empty">
+          <b>영상을 불러오세요</b>
+          <p>MP4 등의 CCTV 영상을 선택하면 분석할 수 있습니다.</p>
+        </div>
+      </div>
+      <div class="controls">
+        <input id="videoUrl" class="urlInput" type="url" placeholder="CCTV 영상 직접 URL (.mp4 등) 입력">
+        <button class="btn primary" id="loadUrl">🔗 URL 불러오기</button>
+      </div>
+      <div class="controls">
+        <button class="btn" id="start">▶ 분석 시작</button>
+        <button class="btn" id="pause">⏸ 일시정지</button>
+        <button class="btn danger" id="stop">■ 정지</button>
+        <button class="btn" id="test">🚨 과속 테스트</button>
+      </div>
+      <div class="note">
+        📌 <b>사용 방법:</b><br>
+        1. CORS 허용 영상 URL을 입력하거나 파일 선택<br>
+        2. "분석 시작" 버튼 클릭<br>
+        3. 실시간 속도 감지 및 경고 수신<br>
+        🔗 직접 재생 가능한 영상 URL(.mp4 등)을 입력하세요.
+      </div>
+    </div>
+
+    <div class="card" id="settings-card">
+      <h2>⚙️ 감지 설정</h2>
+      <div class="form">
+        <div class="field">
+          <label>제한속도 (km/h)</label>
+          <input id="limit" type="number" value="50" min="10" max="120">
+        </div>
+        <div class="field">
+          <label>경고 기준 (km/h)</label>
+          <input id="warning" type="number" value="60" min="10" max="150">
+        </div>
+        <div class="field">
+          <label>픽셀/거리 보정</label>
+          <input id="ppm" type="number" value="15" min="1" max="100" step="0.1">
+        </div>
+        <div class="field">
+          <label>카메라 FPS</label>
+          <input id="fps" type="number" value="30" min="10" max="60">
+        </div>
+      </div>
+      <div class="note">
+        💡 <b>설정 설명:</b><br>
+        • 제한속도: 법적 속도 제한<br>
+        • 경고 기준: 경보 트리거 속도<br>
+        • 픽셀/거리: 화면 보정값 (값이 작을수록 속도 높게 계산)
+      </div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-top:18px">
+    <h2>📊 실시간 통계</h2>
+    <div class="stats">
+      <div class="stat">
+        <small>감지 차량</small>
+        <strong id="vehicles">0</strong>
+      </div>
+      <div class="stat">
+        <small>현재 과속</small>
+        <strong class="danger-t" id="speeding">0</strong>
+      </div>
+      <div class="stat">
+        <small>경고 횟수</small>
+        <strong class="warn" id="alerts">0</strong>
+      </div>
+      <div class="stat">
+        <small>평균 위반 속도</small>
+        <strong class="safe"><span id="avg">0.0</span> km/h</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="logs" style="margin-top:18px">
+    <h2>🚨 과속 경고 로그</h2>
+    <div class="log">
+      <div class="row head">
+        <span>시간</span>
+        <span>차량</span>
+        <span>속도</span>
+        <span>메시지</span>
+      </div>
+      <div id="logBody" class="emptylog">아직 과속 경고가 없습니다.</div>
+    </div>
+    <div class="controls" style="margin-top:13px">
+      <button class="btn" id="saveJson">💾 JSON 저장</button>
+      <button class="btn" id="clear">🗑 로그 초기화</button>
+      <button class="btn" id="voice" title="음성 경고 활성화">🔇 음성 경고 끄기</button>
+    </div>
+  </section>
+
+  <section class="card" id="help" style="margin-top:18px;display:none">
+    <h2>❓ 도움말</h2>
+    <div style="line-height:1.8;font-size:13px;color:#b0bccf">
+      <b style="display:block;color:#fff;margin-bottom:10px">🎬 영상 로드 방법</b>
+      URL 입력 후 "URL 불러오기" 버튼을 클릭합니다. CORS 허용이 필요합니다.<br><br>
+      
+      <b style="display:block;color:#fff;margin-bottom:10px">⚙️ 감지 파라미터</b>
+      • <b>제한속도</b>: 법적 속도 제한<br>
+      • <b>경고 기준</b>: 경보 트리거 속도<br>
+      • <b>픽셀/거리 보정</b>: 값이 작을수록 속도 높게 계산됨<br>
+      • <b>카메라 FPS</b>: 영상 프레임률<br><br>
+      
+      <b style="display:block;color:#fff;margin-bottom:10px">📊 통계</b>
+      감지된 차량 수, 과속 현황, 경고 로그를 실시간으로 표시합니다.<br><br>
+      
+      <b style="display:block;color:#fff;margin-bottom:10px">🔊 음성 경고</b>
+      과속 감지 시 텍스트-음성 변환으로 경고합니다.<br><br>
+      
+      <b style="display:block;color:#fff;margin-bottom:10px">💾 데이터 저장</b>
+      경고 로그를 JSON 형식으로 다운로드할 수 있습니다.
+    </div>
+  </section>
+</main>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const video=$('video'), canvas=$('overlay'), ctx=canvas.getContext('2d',{willReadFrequently:true});
+let running=false, animation=null, prev=null, lastTime=0, detected=0, speeding=0, alerts=[], voice=false, voiceEnabled=true;
+
+function resize(){
+  if(video.videoWidth){
+    canvas.width=video.videoWidth;
+    canvas.height=video.videoHeight;
+  }
+}
+
+function navTo(section){
+  const sections=['dashboard','settings-card','logs','help'];
+  sections.forEach(s=>{
+    const el=$(s.replace('-card',''));
+    if(el) el.style.display = (s===section) ? (s==='dashboard'?'grid':'block') : 'none';
+  });
+  document.querySelectorAll('.nav button').forEach((b,i)=>b.classList.toggle('active',i===['dashboard','settings-card','logs','help'].indexOf(section)));
+}
+
+video.addEventListener('loadedmetadata',()=>{
+  resize();
+  $('empty').style.display='none';
+  $('statusText').textContent='영상 준비 완료';
+});
+
+video.addEventListener('error',()=>{
+  alert('영상을 불러올 수 없습니다. CORS 허용 여부를 확인하세요.');
+  $('statusText').textContent='오류 발생';
+});
+
+$('loadUrl').onclick=()=>{
+  const url=$('videoUrl').value.trim();
+  if(!url){alert('영상 URL을 입력하세요.');return}
+  video.src=url;
+  video.crossOrigin='anonymous';
+  video.load();
+  $('statusText').textContent='영상 불러오는 중';
+};
+
+$('videoUrl').addEventListener('keydown',e=>{if(e.key==='Enter')$('loadUrl').click()});
+
+$('start').onclick=async()=>{
+  if(!video.src){alert('먼저 CCTV 영상을 선택하세요.');return}
+  running=true;
+  $('statusText').textContent='분석 중';
+  try{await video.play();}catch(e){console.log('재생 시작');}
+  loop();
+};
+
+$('pause').onclick=()=>{
+  video.pause();
+  running=false;
+  $('statusText').textContent='일시정지';
+};
+
+$('stop').onclick=()=>{
+  running=false;
+  video.pause();
+  video.currentTime=0;
+  cancelAnimationFrame(animation);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  $('statusText').textContent='대기 중';
+  prev=null;
+  detected=0;
+  speeding=0;
+  $('vehicles').textContent='0';
+  $('speeding').textContent='0';
+};
+
+$('voice').onclick=()=>{
+  voiceEnabled=!voiceEnabled;
+  $('voice').textContent=voiceEnabled?'🔊 음성 경고 켜짐':'🔇 음성 경고 끄기';
+};
+
+function loop(t=0){
+  if(!running)return;
+  if(video.ended){
+    running=false;
+    $('statusText').textContent='영상 종료';
+    return;
+  }
+  
+  const w=video.videoWidth, h=video.videoHeight;
+  if(!w||!h){animation=requestAnimationFrame(loop);return}
+  
+  canvas.width=w;
+  canvas.height=h;
+  ctx.drawImage(video,0,0,w,h);
+  
+  const smallW=320, smallH=Math.max(180,Math.round(320*h/w));
+  const off=document.createElement('canvas');
+  off.width=smallW;
+  off.height=smallH;
+  const ox=off.getContext('2d',{willReadFrequently:true});
+  ox.drawImage(video,0,0,smallW,smallH);
+  const data=ox.getImageData(0,0,smallW,smallH).data;
+  
+  if(prev){
+    let sum=0, minX=smallW, minY=smallH, maxX=0, maxY=0;
+    for(let y=0;y<smallH;y+=3){
+      for(let x=0;x<smallW;x+=3){
+        const i=(y*smallW+x)*4;
+        const p=prev[i];
+        const q=data[i];
+        const d=Math.abs(p-q)+Math.abs(prev[i+1]-data[i+1])+Math.abs(prev[i+2]-data[i+2]);
+        if(d>95){
+          sum++;
+          minX=Math.min(minX,x);
+          minY=Math.min(minY,y);
+          maxX=Math.max(maxX,x);
+          maxY=Math.max(maxY,y);
+        }
+      }
+    }
+    
+    if(sum>35 && maxX>minX){
+      detected=Math.max(detected,1);
+      const scaleX=w/smallW, scaleY=h/smallH;
+      const x=minX*scaleX, y=minY*scaleY, bw=(maxX-minX)*scaleX, bh=(maxY-minY)*scaleY;
+      
+      ctx.strokeStyle='#43dc8b';
+      ctx.lineWidth=Math.max(2,w/500);
+      ctx.strokeRect(x,y,bw,bh);
+      
+      const elapsed=Math.max((t-lastTime)/1000,1/30);
+      const px=Math.hypot((maxX-minX),(maxY-minY));
+      let speed=Math.min(180,(px/Number($('ppm').value))*3.6/elapsed);
+      
+      if(speed>Number($('warning').value) && t-lastTime>900){
+        addAlert(speed,'자동차');
+        lastTime=t;
+      }
+      $('vehicles').textContent=Math.max(1,detected);
+    }
+  }
+  
+  prev=data;
+  animation=requestAnimationFrame(loop);
+}
+
+function addAlert(speed, type='자동차'){
+  const now=new Date();
+  alerts.push({
+    timestamp:now.toLocaleTimeString('ko-KR',{hour12:false}),
+    date:now.toLocaleDateString('ko-KR'),
+    speed:Number(speed.toFixed(1)),
+    vehicle_type:type,
+    location:'압량읍 압독로',
+    message:`주의! 현재 구간에서 과속 단속 중입니다. 안전속도 ${$('limit').value}km/h 이하로 운행하세요.`
+  });
+  
+  speeding=1;
+  $('alerts').textContent=alerts.length;
+  $('speeding').textContent=speeding;
+  
+  const avg=alerts.reduce((a,b)=>a+b.speed,0)/alerts.length;
+  $('avg').textContent=avg.toFixed(1);
+  
+  renderLogs();
+  
+  if(voiceEnabled && 'speechSynthesis' in window){
+    const utterance=new SpeechSynthesisUtterance(`주의! 과속 차량이 감지되었습니다. 현재 속도 ${speed.toFixed(0)}킬로미터입니다.`);
+    utterance.lang='ko-KR';
+    speechSynthesis.speak(utterance);
+  }
+}
+
+function renderLogs(){
+  const body=$('logBody');
+  if(!alerts.length){
+    body.className='emptylog';
+    body.innerHTML='<div style="grid-column:1/-1">아직 과속 경고가 없습니다.</div>';
+    return;
+  }
+  
+  body.className='';
+  body.innerHTML=alerts.slice().reverse().map(a=>
+    `<div class="row">
+      <span>${a.timestamp}</span>
+      <span>${a.vehicle_type}</span>
+      <span style="color:#ff6877;font-weight:600">${a.speed} km/h</span>
+      <span>${a.message}</span>
+    </div>`
+  ).join('');
+}
+
+$('test').onclick=()=>addAlert(Number($('warning').value)+8.5,'자동차');
+
+$('clear').onclick=()=>{
+  if(confirm('경고 로그를 모두 삭제하시겠습니까?')){
+    alerts=[];
+    $('alerts').textContent='0';
+    $('speeding').textContent='0';
+    $('avg').textContent='0.0';
+    renderLogs();
+  }
+};
+
+$('saveJson').onclick=()=>{
+  if(!alerts.length){alert('저장할 경고 기록이 없습니다.');return}
+  const data={
+    system:'CCTV Speeding Detection System',
+    location:'경산시 압량읍 압독로',
+    exportTime:new Date().toLocaleString('ko-KR'),
+    settings:{
+      speedLimit:Number($('limit').value),
+      warningThreshold:Number($('warning').value),
+      pixelsPerMeter:Number($('ppm').value),
+      fps:Number($('fps').value)
+    },
+    alerts:alerts
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`speeding_alerts_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+window.addEventListener('resize',resize);
+
+// 초기 음성 상태 설정
+voiceEnabled=true;
+$('voice').textContent='🔊 음성 경고 켜짐';
+</script>
+</body>
+</html>
